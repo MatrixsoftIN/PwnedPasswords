@@ -1,6 +1,6 @@
 using System;
 
-namespace Matrixsoft.PwnedPasswords.Mvc.Models
+namespace PwnedPasswords.Mvc.Models
 {
     public class ErrorViewModel
     {
