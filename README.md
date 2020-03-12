@@ -5,8 +5,8 @@ In Package Manager Console (Visual Studio), select a specified project into whic
 ## Usage
 ### For .NET Core app:
 ```csharp
-var _client = new PwnedPasswordsClient();
-var flag = await _client.IsPasswordPwnedAsync(password);
+var client = new PwnedPasswordsClient();
+var flag = await client.IsPasswordPwnedAsync(password);
 if (flag)
 {
     // TODO: Failed
