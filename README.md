@@ -34,7 +34,7 @@ public void ConfigureServices(IServiceCollection services)
     services.AddMvc();
 }
 ```
-### Thanks to
+## Thanks
 - [Troy Hunt](https://www.troyhunt.com/)
-### Problems
+## Problems
 If you run into bugs / have feature suggestions / have questions, please file a Github bug.
