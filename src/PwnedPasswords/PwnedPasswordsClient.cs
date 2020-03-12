@@ -7,11 +7,11 @@ using System.Threading.Tasks;
 namespace Matrixsoft.PwnedPasswords
 {
     /// <summary>
-    /// The client consumes <a href="https://haveibeenpwned.com/API/v2#PwnedPasswords"/>PwnedPasswords</a> API v2.
+    /// The client consumes <a href="https://haveibeenpwned.com/API/v3#SearchingPwnedPasswordsByRange"/>PwnedPasswords</a> API v3.
     /// </summary>
     public class PwnedPasswordsClient : IDisposable
     {
-        private readonly string _baseUri = "https://api.pwnedpasswords.com";
+        private const string _baseUri = "https://api.pwnedpasswords.com";
         private readonly HttpClient _client;
         private readonly SHA1 _sha1;
 
@@ -30,29 +30,32 @@ namespace Matrixsoft.PwnedPasswords
         {
             if (string.IsNullOrWhiteSpace(password))
             {
-                throw new ArgumentException("Null or whitespace password", nameof(password));
+                throw new ArgumentException("The password is null or has a whitespace.", nameof(password));
             }
 
             var passwordBytes = Encoding.UTF8.GetBytes(password);
             var hashedPassword = _sha1.ComputeHash(passwordBytes);
             var hashedPasswordString = ByteArrayToString(hashedPassword);
 
-            if (hashedPasswordString.Length != 40)
+            if (hashedPasswordString.Length != 40 || hashedPasswordString.Length < 5)
             {
-                throw new ArgumentException("Invalid password length", nameof(hashedPasswordString));
-            }
-
-            if (hashedPasswordString.Length < 5)
-            {
-                throw new ArgumentException("Invalid password length", nameof(hashedPasswordString));
+                throw new ArgumentException("The password length is not valid.", nameof(hashedPasswordString));
             }
 
             var hashPrefix = hashedPasswordString.Substring(0, 5);
             var passwordHashes = await _client.GetStringAsync($"{_baseUri}/range/{hashPrefix}");
             var hashSuffix = hashedPasswordString.Substring(5);
+
             return passwordHashes.Contains(hashSuffix);
         }
 
+        #region Helpers
+        private static string ByteArrayToString(byte[] data)
+        {
+            return BitConverter.ToString(data).Replace("-", "");
+        }
+        #endregion
+        
         /// <summary>
         /// Releases all resources
         /// </summary>
@@ -61,12 +64,5 @@ namespace Matrixsoft.PwnedPasswords
             _client.Dispose();
             _sha1.Dispose();
         }
-
-        #region Helpers
-        private string ByteArrayToString(byte[] data)
-        {
-            return BitConverter.ToString(data).Replace("-", "");
-        }
-        #endregion
     }
 }

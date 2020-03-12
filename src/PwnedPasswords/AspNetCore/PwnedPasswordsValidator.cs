@@ -27,7 +27,7 @@ namespace Matrixsoft.PwnedPasswords.AspNetCore
         {
             if (string.IsNullOrWhiteSpace(password))
             {
-                throw new ArgumentException("Null or whitespace password", nameof(password));
+                throw new ArgumentException("The password is null or has a whitespace.", nameof(password));
             }
 
             var flag = await _client.IsPasswordPwnedAsync(password);
@@ -35,7 +35,8 @@ namespace Matrixsoft.PwnedPasswords.AspNetCore
             {
                 return IdentityResult.Failed(new IdentityError
                 {
-                    Description = "This password has previously appeared in a data breach and should never be used. If you've ever used it anywhere before, change it immediately!"
+                    Code = "PasswordPwned",
+                    Description = "This password has previously appeared in a data breach and should never be used. If you've ever used it anywhere before, change it!"
                 });
             }
             else
