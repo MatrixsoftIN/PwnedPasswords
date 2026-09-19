@@ -1,48 +1,41 @@
 ﻿using Microsoft.AspNetCore.Identity;
-using System;
-using System.Threading.Tasks;
 
-namespace Matrixsoft.PwnedPasswords.AspNetCore
+namespace Matrixsoft.PwnedPasswords.AspNetCore;
+
+/// <summary>
+/// Validates a password against Troy Hunt's <a href="https://haveibeenpwned.com/Passwords"/>Pwned Passwords</a>
+/// </summary>
+public class PwnedPasswordsValidator<TUser> : IPasswordValidator<TUser> where TUser : class
 {
-    /// <summary>
-    /// Validates a password against Troy Hunt's <a href="https://haveibeenpwned.com/Passwords"/>Pwned Passwords</a> 
-    /// </summary>
-    public class PwnedPasswordsValidator<TUser> : IPasswordValidator<TUser> where TUser : class
+    private readonly PwnedPasswordsClient _client;
+
+    public PwnedPasswordsValidator(PwnedPasswordsClient client)
     {
-        private readonly PwnedPasswordsClient _client;
+        _client = client ?? throw new ArgumentNullException(nameof(client));
+    }
 
-        public PwnedPasswordsValidator(PwnedPasswordsClient client)
+    /// <summary>
+    /// Validates <paramref name="password"/> as an asynchronous operation.
+    /// </summary>
+    /// <param name="manager"></param>
+    /// <param name="user"></param>
+    /// <param name="password">The password supplied for validation</param>
+    /// <returns></returns>
+    public async Task<IdentityResult> ValidateAsync(UserManager<TUser> manager, TUser user, string? password)
+    {
+        if (string.IsNullOrWhiteSpace(password))
         {
-            _client = client ?? throw new ArgumentNullException(nameof(client));
+            throw new ArgumentException("The password is null or has a whitespace.", nameof(password));
         }
 
-        /// <summary>
-        /// Validates <paramref name="password"/> as an asynchronous operation.
-        /// </summary>
-        /// <param name="manager"></param>
-        /// <param name="user"></param>
-        /// <param name="password">The password supplied for validation</param>
-        /// <returns></returns>
-        public async Task<IdentityResult> ValidateAsync(UserManager<TUser> manager, TUser user, string password)
-        {
-            if (string.IsNullOrWhiteSpace(password))
-            {
-                throw new ArgumentException("The password is null or has a whitespace.", nameof(password));
-            }
+        var flag = await _client.IsPasswordPwnedAsync(password);
 
-            var flag = await _client.IsPasswordPwnedAsync(password);
-            if (flag)
+        return flag
+            ? IdentityResult.Failed(new IdentityError
             {
-                return IdentityResult.Failed(new IdentityError
-                {
-                    Code = "PasswordPwned",
-                    Description = "This password has previously appeared in a data breach and should never be used. If you've ever used it anywhere before, change it!"
-                });
-            }
-            else
-            {
-                return IdentityResult.Success;
-            }
-        }
+                Code = "PasswordPwned",
+                Description = "This password has previously appeared in a data breach and should never be used. If you've ever used it anywhere before, change it!"
+            })
+            : IdentityResult.Success;
     }
 }
