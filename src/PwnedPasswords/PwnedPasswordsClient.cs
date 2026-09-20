@@ -6,27 +6,33 @@ namespace Matrixsoft.PwnedPasswords;
 /// <summary>
 /// The client consumes <a href="https://haveibeenpwned.com/API/v3#SearchingPwnedPasswordsByRange"/>PwnedPasswords</a> API v3.
 /// </summary>
-public class PwnedPasswordsClient : IDisposable
+public class PwnedPasswordsClient : IPwnedPasswordsClient, IDisposable
 {
-    private const int HashLength = 40;
-    private const int PrefixLength = 5;
+    internal const int HashLength = 40;
+    internal const int PrefixLength = 5;
     private static readonly Uri BaseUri = new("https://api.pwnedpasswords.com");
     private readonly HttpClient _client;
-#if NET5_0_OR_GREATER
-    // Static SHA1.HashData is used; no instance state required.
-#else
-    private readonly SHA1 _sha1;
-#endif
+    private readonly bool _ownsClient;
+    private bool _disposed;
 
     public PwnedPasswordsClient()
+        : this(new HttpClient(), ownsClient: true)
     {
-        _client = new HttpClient();
-        _client.DefaultRequestHeaders.UserAgent.ParseAdd("Matrixsoft.PwnedPasswords");
-#if NET5_0_OR_GREATER
-        // No instance state required; static SHA1.HashData is used.
-#else
-        _sha1 = SHA1.Create();
-#endif
+    }
+
+    public PwnedPasswordsClient(HttpClient client)
+        : this(client, ownsClient: false)
+    {
+    }
+
+    private PwnedPasswordsClient(HttpClient client, bool ownsClient)
+    {
+        _client = client ?? throw new ArgumentNullException(nameof(client));
+        _ownsClient = ownsClient;
+        if (!_client.DefaultRequestHeaders.UserAgent.Any(h => string.Equals(h.Product?.Name, "Matrixsoft.PwnedPasswords", StringComparison.Ordinal)))
+        {
+            _client.DefaultRequestHeaders.UserAgent.ParseAdd("Matrixsoft.PwnedPasswords");
+        }
     }
 
     /// <summary>
@@ -34,7 +40,15 @@ public class PwnedPasswordsClient : IDisposable
     /// </summary>
     /// <param name="password">The password for the user to hash and check whether it's pwned or not.</param>
     /// <returns></returns>
-    public async Task<bool> IsPasswordPwnedAsync(string? password)
+    public Task<bool> IsPasswordPwnedAsync(string? password) => IsPasswordPwnedAsync(password, CancellationToken.None);
+
+    /// <summary>
+    /// Checks <paramref name="password"/> whether it has previously appeared in a data breach.
+    /// </summary>
+    /// <param name="password">The password for the user to hash and check whether it's pwned or not.</param>
+    /// <param name="cancellationToken">Token to cancel the API request.</param>
+    /// <returns></returns>
+    public async Task<bool> IsPasswordPwnedAsync(string? password, CancellationToken cancellationToken)
     {
 #if NET6_0_OR_GREATER
         ArgumentException.ThrowIfNullOrWhiteSpace(password);
@@ -45,22 +59,21 @@ public class PwnedPasswordsClient : IDisposable
         }
 #endif
 
-        var passwordBytes = Encoding.UTF8.GetBytes(password);
-#if NET5_0_OR_GREATER
-        var hashedPasswordString = Convert.ToHexString(SHA1.HashData(passwordBytes));
-#else
-        var hashedPassword = _sha1.ComputeHash(passwordBytes);
-        var hashedPasswordString = ByteArrayToString(hashedPassword);
-#endif
+        // Null was rejected above; the bang covers the netstandard2.0 leg whose
+        // IsNullOrWhiteSpace contract lacks NotNullWhen for flow analysis.
+        var hashedPasswordString = ComputeSha1Hex(password!);
 
         if (hashedPasswordString.Length != HashLength || hashedPasswordString.Length < PrefixLength)
         {
             throw new ArgumentException("The password length is not valid.", nameof(hashedPasswordString));
         }
 
-        var hashPrefix = hashedPasswordString.Substring(0, PrefixLength);
+        var (hashPrefix, hashSuffix) = SplitHash(hashedPasswordString);
+#if NET5_0_OR_GREATER
+        var passwordHashes = await _client.GetStringAsync(new Uri(BaseUri, $"/range/{hashPrefix}"), cancellationToken).ConfigureAwait(false);
+#else
         var passwordHashes = await _client.GetStringAsync(new Uri(BaseUri, $"/range/{hashPrefix}")).ConfigureAwait(false);
-        var hashSuffix = hashedPasswordString.Substring(PrefixLength);
+#endif
 
 #if NETCOREAPP2_1_OR_GREATER || NETSTANDARD2_1_OR_GREATER
         return passwordHashes.Contains(hashSuffix, StringComparison.Ordinal);
@@ -68,6 +81,19 @@ public class PwnedPasswordsClient : IDisposable
         return passwordHashes.Contains(hashSuffix);
 #endif
     }
+
+    internal static string ComputeSha1Hex(string password)
+    {
+        var passwordBytes = Encoding.UTF8.GetBytes(password);
+#if NET5_0_OR_GREATER
+        return Convert.ToHexString(SHA1.HashData(passwordBytes));
+#else
+        using var sha1 = SHA1.Create();
+        return ByteArrayToString(sha1.ComputeHash(passwordBytes));
+#endif
+    }
+
+    internal static (string Prefix, string Suffix) SplitHash(string hash) => (hash.Substring(0, PrefixLength), hash.Substring(PrefixLength));
 
 #if NET5_0_OR_GREATER
     // Static SHA1.HashData is used; legacy hex helper not required.
@@ -83,11 +109,17 @@ public class PwnedPasswordsClient : IDisposable
     /// </summary>
     public void Dispose()
     {
-        _client.Dispose();
-#if NET5_0_OR_GREATER
-        // No instance state to release; static SHA1.HashData is used.
-#else
-        _sha1.Dispose();
-#endif
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+        if (_ownsClient)
+        {
+            _client.Dispose();
+        }
+
+        GC.SuppressFinalize(this);
     }
 }
