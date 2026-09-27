@@ -1,4 +1,5 @@
 using System.Net;
+
 using Xunit;
 
 namespace Matrixsoft.PwnedPasswords.Tests;

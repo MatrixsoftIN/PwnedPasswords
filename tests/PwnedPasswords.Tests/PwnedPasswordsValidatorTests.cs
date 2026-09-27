@@ -1,5 +1,7 @@
 using Matrixsoft.PwnedPasswords.AspNetCore;
+
 using NSubstitute;
+
 using Xunit;
 
 namespace Matrixsoft.PwnedPasswords.Tests;
