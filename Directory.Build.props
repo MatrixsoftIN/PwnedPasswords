@@ -11,6 +11,8 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Include="$(MSBuildThisFileDirectory)README.md" Pack="true" PackagePath="\" />
+    <None Include="$(MSBuildThisFileDirectory)LICENSE" Pack="true" PackagePath="\" />
     <!-- MinVer stamps Version/AssemblyVersion/FileVersion/InformationalVersion from git tags. -->
     <PackageReference Include="MinVer" PrivateAssets="All" />
   </ItemGroup>
