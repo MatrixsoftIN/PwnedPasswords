@@ -1,7 +1,17 @@
+<!-- Shared language settings and MinVer versioning.
+     Version comes from git tags via MinVer (SemVer): tag v2.0.0 to release 2.0.0.
+     Never hardcode <Version> in any project. -->
 <Project>
   <PropertyGroup>
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <!-- Our tags are v-prefixed (v2.0.0); without this MinVer ignores them. -->
+    <MinVerTagPrefix>v</MinVerTagPrefix>
   </PropertyGroup>
+
+  <ItemGroup>
+    <!-- MinVer stamps Version/AssemblyVersion/FileVersion/InformationalVersion from git tags. -->
+    <PackageReference Include="MinVer" PrivateAssets="All" />
+  </ItemGroup>
 </Project>
